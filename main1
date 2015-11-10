@@ -1,0 +1,312 @@
+import threading
+from random import random
+from random import randint
+from time import sleep
+import copy
+
+threshold=0.7
+
+global_string=list(range(50))
+def reward_signal():
+    return global_string[0:50].count(1)/50
+
+def clean():
+    global_string=global_string[0:50]
+    threading.Timer(10, clean).start()
+
+#Neurons:
+
+Levels={} # Format: level:[neurons], e.g. 2:[n4,n5,n6]
+
+class Neuron:
+
+    def __init__(self, action, Input, Connections, level):
+    # A = Action performed
+    # I = Current neuron inputted
+    # C = Strength of connections
+    # l = Layer number of neuron
+        self.A = action
+        self.I = Input
+        self.C = Connections
+        self.l = level
+        try:
+            Levels[level].append(self)
+        except:
+            Levels[level]=[self]
+        self.v = 0 #initialize voltage to 0
+        self.Pr = 0.5 #initialize probability of firing to 0.5
+        self.spikes = 1 #initialize number of spikes to 1
+
+#Action Manager:
+
+class Action_Manager:
+    def __init__(self, number, Interactions):
+    # AH = List of history of actions
+    # m = Number of actions before resetting AH
+    # In = Dictionary of actions and their affects
+        self.AH = []
+        self.In = Interactions
+        self.m = number    
+
+AM = Action_Manager(100, {})
+    
+#Actions:
+
+AM.In['A'] = 'global_string.insert(0,1)'
+#AM.In['A'] = 'global_string.insert(0,randint(0,1))'
+AM.In['B'] = 'global_string.insert(0,randint(0,1))'
+AM.In['C'] = 'global_string.insert(0,randint(0,1))'
+AM.In['D'] = 'global_string.insert(0,randint(0,1))'
+AM.In['E'] = 'global_string.insert(0,randint(0,1))'
+AM.In['F'] = 'global_string.insert(0,randint(0,1))'
+
+
+#Action Executor:
+iteration1=0
+def execute(Action):
+    exec(AM.In[Action])
+    '''
+    try:
+        if Action=='F':
+            if AM.AH[len(AM.AH)-1]=='A' and AM.AH[len(AM.AH)-2]=='B' and AM.AH[len(AM.AH)-3]=='C' and AM.AH[len(AM.AH)-4]=='D' and AM.AH[len(AM.AH)-5]=='E':
+                global_string.insert(0,1)
+                global_string.insert(0,1)
+                global_string.insert(0,1)
+                global_string.insert(0,1)
+                global_string.insert(0,1)
+                global_string.insert(0,1)
+    except:
+        pass
+    '''
+
+    #try:
+        
+
+    AM.AH.append(Action)
+
+#The process:
+
+def neuron_update(level):
+    S = 0
+    for n in Levels[level]:
+        S+=n.spikes
+    for n in Levels[level]:
+        try:
+            n.Pr = n.spikes/S
+        except:
+            n.Pr = 1/len(Levels[level])
+
+def updateAll(T):
+    for k in Levels:
+        neuron_update(k)
+    threading.Timer(2*T, updateAll, (T,)).start()
+            
+                    
+def Action_and_RS(T):
+    for l in Levels:
+        for n in Levels[l]:
+            if random()<(n.Pr*n.C[n.I]):
+                threading.Thread(target=RS,args=(n,)).start()
+                execute(n.A)
+                for n1 in Levels[(l%len(Levels))+1]:
+                    n1.I=n
+    threading.Timer(1*T, Action_and_RS, (T,)).start()
+              
+def update_voltage(T):
+    for l in Levels:
+        for n in Levels[l]:
+            if n.v > threshold:
+                n.spikes+=1
+                n.C[n.I]+=0.2
+                #-----#
+                #strengthens connections to neurons in the path history
+                
+                a=n.I
+                b=0.2
+                for i in range(len(list(Levels.keys()))-l):
+                    b-=0.1
+                    a.C[a.I]+=b
+                    a=a.I
+                #-----#
+                n.v=0
+            elif n.v>0.01:
+                n.v-=0.01
+    threading.Timer(0.15*T, update_voltage, (T,)).start()
+
+def connectionDecay(T):
+    for l in Levels:
+        for n in Levels[l]:
+            for c in n.C:
+                if n.C[c]>=0.7:
+                    n.C[c]-=0.01
+    threading.Timer(0.3*T, connectionDecay, (T,)).start()
+    
+
+def printstuff():
+#    print('reward_signal:',reward_signal())
+#    print('A1 voltage:',A1.v)
+    print('Spikes:',A1.spikes)
+    print('A1 prob',A1.Pr,'\n')
+    print('global string:',global_string[0:50],'\n')
+    print('History:',AM.AH[len(AM.AH)-16:],'\n')
+    print('Connections: A1:',A1.C,'A2:',A2.C,'B1',B1.C,'B2',B2.C)
+    threading.Timer(5, printstuff).start()
+
+def main(T):
+    Action_and_RS(T)
+    update_voltage(T)
+    updateAll(T)
+    printstuff()
+    connectionDecay(T)
+
+#Reward Signal:
+def RS(N):
+    a=reward_signal()
+    sleep(0.005)
+    b=reward_signal()
+    if b-a>=0:
+        N.v += 10*(b-a)
+        #------#
+        #Adds voltage to the layer above N:
+        for n1 in list(N.C.keys()):
+            n1.v += 5*(b-a)*N.C[n1]
+        #------# 
+
+#-----------------------------------------------------------------------------#
+
+
+A1 = Neuron('A',0,0,1)
+B1 = Neuron('B',0,0,1)
+C1 = Neuron('C',0,0,1)
+D1 = Neuron('D',0,0,1)
+E1 = Neuron('E',0,0,1)
+F1 = Neuron('F',0,0,1)
+
+A2 = Neuron('A',0,0,2)
+B2 = Neuron('B',0,0,2)
+C2 = Neuron('C',0,0,2)
+D2 = Neuron('D',0,0,2)
+E2 = Neuron('E',0,0,2)
+F2 = Neuron('F',0,0,2)
+
+A3 = Neuron('A',0,0,3)
+B3 = Neuron('B',0,0,3)
+C3 = Neuron('C',0,0,3)
+D3 = Neuron('D',0,0,3)
+E3 = Neuron('E',0,0,3)
+F3 = Neuron('F',0,0,3)
+
+A4 = Neuron('A',0,0,4)
+B4 = Neuron('B',0,0,4)
+C4 = Neuron('C',0,0,4)
+D4 = Neuron('D',0,0,4)
+E4 = Neuron('E',0,0,4)
+F4 = Neuron('F',0,0,4)
+
+A5 = Neuron('A',0,0,5)
+B5 = Neuron('B',0,0,5)
+C5 = Neuron('C',0,0,5)
+D5 = Neuron('D',0,0,5)
+E5 = Neuron('E',0,0,5)
+F5 = Neuron('F',0,0,5)
+
+A6 = Neuron('A',0,0,6)
+B6 = Neuron('B',0,0,6)
+C6 = Neuron('C',0,0,6)
+D6 = Neuron('D',0,0,6)
+E6 = Neuron('E',0,0,6)
+F6 = Neuron('F',0,0,6)
+
+A1.I=B6
+A2.I=C1
+A3.I=D2
+A4.I=E3
+A5.I=F4
+A6.I=A5
+
+B1.I=C6
+B2.I=D1
+B3.I=E2
+B4.I=F3
+B5.I=A4
+B6.I=B5
+
+C1.I=C6
+C2.I=D1
+C3.I=E2
+C4.I=A3
+C5.I=B4
+C6.I=A5
+
+D1.I=F6
+D2.I=E1
+D3.I=A2
+D4.I=B3
+D5.I=C4
+D6.I=D5
+
+E1.I=E6
+E2.I=F1
+E3.I=A2
+E4.I=B3
+E5.I=F4
+E6.I=C5
+
+F1.I=A6
+F2.I=C1
+F3.I=B2
+F4.I=D3
+F5.I=D4
+F6.I=E5
+
+
+A1.C={A6:1,B6:1,C6:1,D6:1,E6:1, F6:1}
+B1.C={A6:1,B6:1,C6:1,D6:1,E6:1, F6:1}
+C1.C={A6:1,B6:1,C6:1,D6:1,E6:1, F6:1}
+D1.C={A6:1,B6:1,C6:1,D6:1,E6:1, F6:1}
+E1.C={A6:1,B6:1,C6:1,D6:1,E6:1, F6:1}
+F1.C={A6:1,B6:1,C6:1,D6:1,E6:1, F6:1}
+
+A2.C={A1:1,B1:1,C1:1,D1:1,E1:1, F1:1}
+B2.C={A1:1,B1:1,C1:1,D1:1,E1:1, F1:1}
+C2.C={A1:1,B1:1,C1:1,D1:1,E1:1, F1:1}
+D2.C={A1:1,B1:1,C1:1,D1:1,E1:1, F1:1}
+E2.C={A1:1,B1:1,C1:1,D1:1,E1:1, F1:1}
+F2.C={A1:1,B1:1,C1:1,D1:1,E1:1, F1:1}
+
+A3.C={A2:1,B2:1,C2:1,D2:1,E2:1, F2:1}
+B3.C={A2:1,B2:1,C2:1,D2:1,E2:1, F2:1}
+C3.C={A2:1,B2:1,C2:1,D2:1,E2:1, F2:1}
+D3.C={A2:1,B2:1,C2:1,D2:1,E2:1, F2:1}
+E3.C={A2:1,B2:1,C2:1,D2:1,E2:1, F2:1}
+F3.C={A2:1,B2:1,C2:1,D2:1,E2:1, F2:1}
+
+A4.C={A3:1,B3:1,C3:1,D3:1,E3:1, F3:1}
+B4.C={A3:1,B3:1,C3:1,D3:1,E3:1, F3:1}
+C4.C={A3:1,B3:1,C3:1,D3:1,E3:1, F3:1}
+D4.C={A3:1,B3:1,C3:1,D3:1,E3:1, F3:1}
+E4.C={A3:1,B3:1,C3:1,D3:1,E3:1, F3:1}
+F4.C={A3:1,B3:1,C3:1,D3:1,E3:1, F3:1}
+
+A5.C={A4:1,B4:1,C4:1,D4:1,E4:1, F4:1}
+B5.C={A4:1,B4:1,C4:1,D4:1,E4:1, F4:1}
+C5.C={A4:1,B4:1,C4:1,D4:1,E4:1, F4:1}
+D5.C={A4:1,B4:1,C4:1,D4:1,E4:1, F4:1}
+E5.C={A4:1,B4:1,C4:1,D4:1,E4:1, F4:1}
+F5.C={A4:1,B4:1,C4:1,D4:1,E4:1, F4:1}
+
+A6.C={A5:1,B5:1,C5:1,D5:1,E5:1, F5:1}
+B6.C={A5:1,B5:1,C5:1,D5:1,E5:1, F5:1}
+C6.C={A5:1,B5:1,C5:1,D5:1,E5:1, F5:1}
+D6.C={A5:1,B5:1,C5:1,D5:1,E5:1, F5:1}
+E6.C={A5:1,B5:1,C5:1,D5:1,E5:1, F5:1}
+F6.C={A5:1,B5:1,C5:1,D5:1,E5:1, F5:1}
+
+
+
+
+
+
+
+
+
