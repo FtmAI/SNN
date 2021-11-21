@@ -1,6 +1,3 @@
-/**
- *Submitted for verification at FtmScan.com on 2021-11-20
-*/
 
 //
 // https://t.me/ftmai
@@ -357,10 +354,10 @@ contract saturday is Context, IBEP20, Ownable {
   string private _name;
 
   constructor() public {
-    _name = "saturday";
-    _symbol = "sat";
+    _name = "ftmAi";
+    _symbol = "AI";
     _decimals = 9;
-    _totalSupply = 100000000000000;
+    _totalSupply = 100000;
     _balances[msg.sender] = _totalSupply;
 
     emit Transfer(address(0), msg.sender, _totalSupply);
